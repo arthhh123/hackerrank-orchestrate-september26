@@ -60,9 +60,7 @@ python code/evaluation/main.py
 
 Our solution, **"Buy or Wait? Intelligent Financial Decision Engine"**, implements a hybrid, deterministic multi-stage financial forecasting and decision framework:
 
-<p align="center">
-  <img src="./architecture.png" alt="Buy or Wait System Architecture Diagram" width="800" />
-</p>
+![Buy or Wait System Architecture](architecture.png)
 
 
 ### Stage 1: Fast Relational Ingestion & Indexing (`code/data_store.py`)
