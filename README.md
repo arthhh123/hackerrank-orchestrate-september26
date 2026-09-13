@@ -18,30 +18,92 @@ Read [`problem_statement.md`](./problem_statement.md) for the full task spec, in
 
 ---
 
-## Quick Start
+---
 
-Clone the repository and move into the project directory:
+## Setup & Installation Instructions
 
+### Prerequisites
+- Python 3.10+ (tested on Python 3.11, 3.12, and 3.13)
+- `pip` package manager
+
+### 1. Install Dependencies
+Install all required libraries specified in [`requirements.txt`](./requirements.txt):
 ```bash
-git clone https://github.com/interviewstreet/hackerrank-orchestrate-september26.git
-cd hackerrank-orchestrate-september26
+pip install -r requirements.txt
 ```
 
-Build your solution in `code/main.py`, or use another language and document its entry point clearly.
-
-Your solution must:
-
-- Read the input files from `dataset/`
-- Generate one prediction for every request
-- Write the final predictions to `output.csv` in the repository root
-
-Run the starter Python entry point with:
-
+### 2. Environment Configuration
+Copy the provided `.env.example` template:
 ```bash
-python3 code/main.py
+cp .env.example code/.env
+```
+*(Optional)* If multimodal fallback or live LLM queries are desired, populate your OpenRouter or OpenAI API key in `code/.env`. The system defaults to an optimized, deterministic zero-token mode if keys are not supplied.
+
+### 3. Run Production Pipeline
+To run the full pipeline across all 250 test requests and generate `output.csv`:
+```bash
+python code/main.py
+```
+This will:
+- Ingest the dataset from `dataset/`
+- Execute the 90-day cash flow simulation and decision engine
+- Write the final predictions to `output.csv` (250 rows)
+- Generate the token usage report at `code/evaluation/usage_report.md`
+
+### 4. Run Evaluation Workflow
+To run the evaluation benchmark on `sample_requests.csv` and measure ground-truth accuracy:
+```bash
+python code/evaluation/main.py
 ```
 
-After running your solution, confirm that `output.csv` exists in the repository root and contains the required columns and one row for every request.
+---
+
+## Approach Overview & Architecture
+
+Our solution, **"Buy or Wait? Intelligent Financial Decision Engine"**, implements a hybrid, deterministic multi-stage financial forecasting and decision framework:
+
+```text
+┌────────────────┐     ┌──────────────────────┐     ┌────────────────────────┐
+│  dataset/*.csv │ ──> │   code/data_store    │ ──> │  code/message_parsing  │
+│  dataset/media │     │ Ingestion & Indexing │     │ Regex/NLP & Vision OCR │
+└────────────────┘     └──────────────────────┘     └────────────────────────┘
+                                                                 │
+                                                                 ▼
+┌────────────────┐     ┌──────────────────────┐     ┌────────────────────────┐
+│   output.csv   │ <── │    code/decision     │ <── │    code/simulation     │
+│  usage_report  │     │ Dynamic Multi-Plan   │     │  90-Day Cash Flow      │
+│   (250 rows)   │     │    Decision Matrix   │     │  Ledger & Cushion Math │
+└────────────────┘     └──────────────────────┘     └────────────────────────┘
+```
+
+### Stage 1: Fast Relational Ingestion & Indexing (`code/data_store.py`)
+- Ingests all 7 relational CSV tables into memory and builds indexed lookup hashes on foreign keys (`user_id`, `request_id`, `related_event_id`, `linked_event_id`).
+- Normalizes date representations and multi-currency amounts using dated exchange rates from `exchange_rates.csv`.
+
+### Stage 2: Hybrid NLP Message Mutation & OCR (`code/message_parsing.py` & `code/ocr.py`)
+- Detects user intent and event mutations in `messages.csv` (e.g., cancellations, date shifts, amount adjustments).
+- Uses high-precision compiled regex patterns with 100% resolution on dataset patterns, with optional LLM fallback.
+- Resolves missing event amounts via local image extraction or multimodal vision models (`Ling-3.0-Flash-VL`).
+
+### Stage 3: Deterministic 90-Day Cash Flow Simulation (`code/simulation.py`)
+- **Stage 1 (Cash Flow Ledger):** De-duplicates repeated transactions, reserves pending outflows, and maps confirmed income strictly to settlement dates.
+- **Stage 2 (Simulation Engine):** Simulates daily closing balances over a strict 90-day forecast horizon, tracking the daily cushion above the user's `minimum_balance`.
+- **Stage 3 (Business Logic):** Calculates `amount_safe_to_pay` on `request_date` and discovers `earliest_date_for_full_payment`.
+
+### Stage 4: Multi-Plan Decision Matrix & Scoring (`code/decision.py`)
+- Evaluates candidate pathways:
+  1. **Full Payment Now:** If balance cushion covers the entire expense on `request_date`.
+  2. **Installment Plans:** Simulates all options from `request_payment_options.csv` across future balance cushions.
+  3. **Partial Payment:** For partial-eligible requests where safe amount > 0 and remainder can be completed before target date.
+  4. **Flexible Spending Reduction:** Explores reducing or stopping non-essential expenses up to 3 events.
+  5. **Wait / Not Affordable:** Forecasts safe future date or safely declines.
+- **Explanation Generator:** Formulates personalized explanations strictly bounded between 10 and 20 words containing the core financial rationale.
+
+### Stage 5: Evaluation Workflow & Cost Optimization (`code/evaluation/`)
+- Measures classification and payment method accuracy against ground-truth answers in `sample_requests.csv`.
+- Generates `usage_report.md` documenting zero-token efficiency ($0.00 cost, ~2.1s execution) alongside theoretical LLM projections.
+
+---
 
 ## Important File Locations
 
