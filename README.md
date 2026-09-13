@@ -60,21 +60,10 @@ python code/evaluation/main.py
 
 Our solution, **"Buy or Wait? Intelligent Financial Decision Engine"**, implements a hybrid, deterministic multi-stage financial forecasting and decision framework:
 
-```mermaid
-flowchart LR
-    IDX["Indexing"] --> ASM{"Data Ingestion /<br/>Assembly"}
-    OCR["Image OCR"] --> ASM
-    NLP["Message Parsing<br/>(NLP + LLM)"] --> ASM
+<p align="center">
+  <img src="./architecture.png" alt="Buy or Wait System Architecture Diagram" width="800" />
+</p>
 
-    ASM --> SIM["90-DAY Simulation<br/><b>(No LLM)</b>"]
-    SIM --> DEC(("Decision Engine<br/>(Scoring + Decision Tree)"))
-    DEC --> OUT[/"Output.csv"/]
-
-    style SIM fill:#5c2424,stroke:#e06c75,stroke-width:2px,color:#fff
-    style DEC fill:#1c4033,stroke:#98c379,stroke-width:2px,color:#fff
-    style ASM fill:#1b3b4f,stroke:#61afef,stroke-width:2px,color:#fff
-    style OUT fill:#3d224d,stroke:#c678dd,stroke-width:2px,color:#fff
-```
 
 ### Stage 1: Fast Relational Ingestion & Indexing (`code/data_store.py`)
 - Ingests all 7 relational CSV tables into memory and builds indexed lookup hashes on foreign keys (`user_id`, `request_id`, `related_event_id`, `linked_event_id`).
