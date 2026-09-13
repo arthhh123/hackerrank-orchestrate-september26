@@ -11,6 +11,24 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Union
 import pandas as pd
 
+# Automatically load environment variables from .env if present
+def _load_env_file() -> None:
+    for env_path in [Path(__file__).resolve().parent / ".env", Path(__file__).resolve().parent.parent / ".env"]:
+        if env_path.exists():
+            try:
+                with open(env_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith("#") and "=" in line:
+                            k, v = line.split("=", 1)
+                            k, v = k.strip(), v.strip().strip("'\"")
+                            if k and k not in os.environ:
+                                os.environ[k] = v
+            except Exception:
+                pass
+
+_load_env_file()
+
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage
 from langchain_core.output_parsers import StrOutputParser
@@ -52,7 +70,10 @@ def resolve_image_for_user(
         raise ValueError(f"No image record found for user_id: '{user_id}'")
 
     image_id = str(user_matches.iloc[0]["image_id"]).strip()
-    image_path = img_directory / f"{image_id}.png"
+    image_path = (img_directory / f"{image_id}.png").resolve()
+    if not image_path.is_relative_to(img_directory.resolve()):
+        raise PermissionError(f"Security: Path traversal attempt detected for image_id '{image_id}'")
+
     if not image_path.exists():
         raise FileNotFoundError(f"Image file not found on disk at: {image_path}")
 
@@ -62,6 +83,7 @@ def resolve_image_for_user(
 def create_ocr_pipeline(
     api_key: Optional[str] = os.getenv("OPENROUTER_API_KEY"),
     model_name: Optional[str] = os.getenv("OPENROUTER_MODEL_NAME"),
+    base_url: Optional[str] = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1" if os.getenv("OPENROUTER_API_KEY") else None),
 ):
     """
     Creates a LangChain pipeline for image OCR to extract missing values.
@@ -72,14 +94,18 @@ def create_ocr_pipeline(
     Output:
         Extracted text string used to complete missing/NaN values.
     """
-    resolved_api_key = api_key or os.environ.get("OPENAI_API_KEY", "<OPENAI_API_KEY>")
-    resolved_model_name = model_name or os.environ.get("OPENAI_MODEL_NAME", "<OPENAI_MODEL_NAME>")
+    resolved_api_key = api_key or os.getenv("OPENROUTER_API_KEY") or os.getenv("OPENAI_API_KEY", "<OPENAI_API_KEY>")
+    resolved_model_name = model_name or os.getenv("OPENROUTER_MODEL_NAME") or os.getenv("OPENAI_MODEL_NAME", "<OPENAI_MODEL_NAME>")
+    resolved_base_url = base_url or os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
 
-    llm = ChatOpenAI(
-        model=resolved_model_name,
-        api_key=resolved_api_key,
-        temperature=0.0,
-    )
+    llm_kwargs: Dict[str, Any] = {
+        "model": resolved_model_name,
+        "api_key": resolved_api_key,
+        "base_url": resolved_base_url,
+        "temperature": 0.0,
+    }
+
+    llm = ChatOpenAI(**llm_kwargs)
 
     def prepare_multimodal_payload(inputs: Dict[str, Any]) -> list:
         if "user_id" in inputs and inputs["user_id"]:

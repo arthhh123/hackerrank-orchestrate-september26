@@ -42,34 +42,62 @@ def _to_bool(val: Any) -> bool:
 def _extract_amount_from_ocr_text(val: Any) -> Optional[float]:
     """
     Parses raw text or string returned by an OCR pipeline into a clean float amount.
-    Handles comma-thousands (1,422.85), European/Indonesian period-thousands
-    (5.491.000 or 5.491.000,00), currency symbols, and multiline text.
+    Resilient against:
+    - Dates (e.g. '2025-08-01') which should not be confused with invoice amounts
+    - European/Indonesian period-thousands (e.g. 5.491.000 or 5.491.000,00)
+    - Comma-thousands (e.g. 1,422.85)
+    - Multiline text, currency symbols, and text labels
     """
     if val is None or pd.isna(val):
         return None
     if isinstance(val, (int, float)):
         return float(val)
+
     text = str(val).strip()
-    # Bug 4 fix: detect European/Indonesian period-as-thousands-separator format.
-    # Pattern: one or more groups of exactly 3 digits separated by periods,
-    # optionally followed by a comma-decimal part (e.g. 5.491.000,00).
-    euro_match = re.search(r'\d{1,3}(?:\.\d{3})+(?:,\d+)?', text)
+
+    # 1. Search for explicit currency-anchored amounts (e.g. $1,450.00, IDR 5.000.000, EUR 320.50)
+    curr_match = re.search(r'(?:[\$€£₹]|IDR|EUR|USD|ZAR|INR|GBP)\s*([\d\.,]+)', text, re.IGNORECASE)
+    if curr_match:
+        target = curr_match.group(1).strip()
+        if re.search(r'\d{1,3}(?:\.\d{3})+(?:,\d+)?', target):
+            try:
+                return float(target.replace('.', '').replace(',', '.'))
+            except ValueError:
+                pass
+        try:
+            return float(target.replace(',', ''))
+        except ValueError:
+            pass
+
+    # 2. Strip full dates (YYYY-MM-DD, DD/MM/YYYY, etc.) to prevent year numbers from being parsed as amounts
+    text_without_dates = re.sub(r'\b\d{4}[-/]\d{1,2}[-/]\d{1,2}\b|\b\d{1,2}[-/]\d{1,2}[-/]\d{4}\b', '', text)
+
+    # 3. Detect European/Indonesian period-as-thousands format
+    euro_match = re.search(r'\d{1,3}(?:\.\d{3})+(?:,\d+)?', text_without_dates)
     if euro_match:
         raw = euro_match.group()
-        # Remove period thousands-separators, convert comma decimal to period.
         normalized = raw.replace('.', '').replace(',', '.')
         try:
             return float(normalized)
         except ValueError:
             pass
-    # Standard format: commas are thousands separators (e.g. 1,422.85)
-    text = text.replace(',', '')
-    matches = re.findall(r'\d+\.?\d*', text)
-    for match in matches:
-        try:
-            return float(match)
-        except ValueError:
-            continue
+
+    # 4. Standard format: commas as thousands separators, look for numbers
+    cleaned = text_without_dates.replace(',', '')
+    matches = re.findall(r'\b\d+(?:\.\d+)?\b', cleaned)
+    if matches:
+        candidates = []
+        for m in matches:
+            try:
+                val_f = float(m)
+                if val_f > 0.0:
+                    candidates.append(val_f)
+            except ValueError:
+                continue
+        if candidates:
+            # Usually the invoice grand total is the last/largest amount mentioned
+            return candidates[-1]
+
     return None
 
 
