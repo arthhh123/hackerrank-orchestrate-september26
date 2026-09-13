@@ -308,9 +308,9 @@ def run_pipeline(
     output_df.to_csv(output_csv_path, index=False)
     print(f"[+] Successfully wrote {len(output_df)} predictions to: {output_csv_path}")
 
-    # Also write a copy to root repository output.csv if path is different
+    # Also write a copy to root repository output.csv if path is different and evaluating full requests
     root_output_path = BASE_DIR / "output.csv"
-    if root_output_path.resolve() != output_csv_path.resolve():
+    if requests_filename == "requests.csv" and root_output_path.resolve() != output_csv_path.resolve():
         output_df.to_csv(root_output_path, index=False)
         print(f"[+] Synced copy to: {root_output_path}")
 

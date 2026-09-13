@@ -1,0 +1,26 @@
+request_id,amount_safe_to_pay,affordability_status,recommended_payment_method,payment_plan,earliest_date_for_full_payment,spending_changes_needed,decision_explanation
+request_01,25256.0,affordable_now,full_payment,2024-03-03:25256.00,2024-03-03,none,"Pay ZAR 25,256.00 in full on 2024-03-03. Your minimum balance of ZAR 18,000 remains protected."
+request_02,31225489.2,not_affordable,not_recommended,none,,none,"Do not proceed with the IDR 46,018,000.00 request. Your balance cannot safely support this expense within 90 days."
+request_03,3141600.0,not_affordable,not_recommended,none,,none,"Do not proceed with the IDR 5,491,000.00 request. Your balance cannot safely support this expense within 90 days."
+request_04,12693000.0,affordable_now,full_payment,2024-06-04:12693000.00,2024-06-04,none,"Pay IDR 12,693,000.00 in full on 2024-06-04. Your minimum balance of IDR 30,686,600 remains protected."
+request_05,15488.0,affordable_now,full_payment,2025-11-06:15488.00,2025-11-06,none,"Pay ZAR 15,488.00 in full on 2025-11-06. Your minimum balance of ZAR 13,100 remains protected."
+request_06,620.4,affordable_now,full_payment,2026-01-03:620.40,2026-01-03,none,Pay EUR 620.40 in full on 2026-01-03. Your minimum balance of EUR 800 remains protected.
+request_07,125945.56,not_affordable,not_recommended,none,,none,"Do not proceed with the INR 197,400.00 request. Your balance cannot safely support this expense within 90 days."
+request_08,736.57,not_affordable,not_recommended,none,,none,Do not proceed with the EUR 996.60 request. Your balance cannot safely support this expense within 90 days.
+request_09,166.61,affordable_now,full_payment,2026-07-04:166.61,2026-07-04,none,Pay EUR 166.61 in full on 2026-07-04. Your minimum balance of EUR 600 remains protected.
+request_10,266700.0,not_affordable,not_recommended,none,2024-12-06,none,"Do not proceed with the INR 266,700.00 request. Your balance cannot safely support this expense within 90 days."
+request_11,13110000.0,affordable_now,full_payment,2025-05-03:13110000.00,2025-05-03,none,"Pay IDR 13,110,000.00 in full on 2025-05-03. Your minimum balance of IDR 34,140,600 remains protected."
+request_12,65164.0,affordable_with_plan,installments,2026-04-19:22590.19|2026-05-20:22590.19|2026-06-20:22590.19,2026-04-05,none,"Use 3 installments of ZAR 22,590.19 starting 2026-04-19. This fits your cash flow safely."
+request_13,941.6,affordable_now,full_payment,2024-03-07:941.60,2024-03-07,none,"Pay EUR 941.60 in full on 2024-03-07. Your minimum balance of EUR 1,300 remains protected."
+request_14,1731.74,not_affordable,not_recommended,none,,none,"Do not proceed with the EUR 5,414.20 request. Your balance cannot safely support this expense within 90 days."
+request_15,570.05,not_affordable,not_recommended,none,,none,"Do not proceed with the EUR 3,685.00 request. Your balance cannot safely support this expense within 90 days."
+request_16,122500.0,affordable_now,full_payment,2023-08-12:122500.00,2023-08-12,none,"Pay INR 122,500.00 in full on 2023-08-12. Your minimum balance of INR 122,400 remains protected."
+request_17,274600.0,affordable_with_plan,installments,2026-03-01:95194.67|2026-03-31:95194.67|2026-04-30:95194.67,2026-03-01,none,"Use 3 installments of INR 95,194.67 starting 2026-03-01. This fits your cash flow safely."
+request_18,1086.0,not_affordable,not_recommended,none,,none,"Do not proceed with the EUR 3,246.10 request. Your balance cannot safely support this expense within 90 days."
+request_19,39660.0,affordable_with_plan,installments,2024-09-04:20623.20|2024-10-02:20623.20,2024-09-04,none,"Use 2 installments of INR 20,623.20 starting 2024-09-04. This fits your cash flow safely."
+request_20,38109.05,not_affordable,not_recommended,none,,none,"Do not proceed with the INR 303,700.00 request. Your balance cannot safely support this expense within 90 days."
+request_21,1574.4,affordable_now,full_payment,2026-04-03:1574.40,2026-04-03,none,"Pay USD 1,574.40 in full on 2026-04-03. Your minimum balance of USD 1,800 remains protected."
+request_22,632.46,not_affordable,not_recommended,none,,none,Do not proceed with the EUR 731.50 request. Your balance cannot safely support this expense within 90 days.
+request_23,24957.9,not_affordable,not_recommended,none,,none,"Do not proceed with the ZAR 38,016.00 request. Your balance cannot safely support this expense within 90 days."
+request_24,32215.0,not_affordable,not_recommended,none,,none,"Do not proceed with the INR 109,600.00 request. Your balance cannot safely support this expense within 90 days."
+request_25,8683950.0,not_affordable,not_recommended,none,,none,"Do not proceed with the IDR 60,496,000.00 request. Your balance cannot safely support this expense within 90 days."
