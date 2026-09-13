@@ -9,6 +9,7 @@ and assembles an isolated, clean RequestContext dictionary per request on demand
 
 from collections import defaultdict
 from pathlib import Path
+import re
 from typing import Any, Dict, List, Optional, Set, Union
 import pandas as pd
 
@@ -36,6 +37,40 @@ def _to_bool(val: Any) -> bool:
     if isinstance(val, bool):
         return val
     return str(val).strip().lower() in ("true", "1", "yes")
+
+
+def _extract_amount_from_ocr_text(val: Any) -> Optional[float]:
+    """
+    Parses raw text or string returned by an OCR pipeline into a clean float amount.
+    Handles comma-thousands (1,422.85), European/Indonesian period-thousands
+    (5.491.000 or 5.491.000,00), currency symbols, and multiline text.
+    """
+    if val is None or pd.isna(val):
+        return None
+    if isinstance(val, (int, float)):
+        return float(val)
+    text = str(val).strip()
+    # Bug 4 fix: detect European/Indonesian period-as-thousands-separator format.
+    # Pattern: one or more groups of exactly 3 digits separated by periods,
+    # optionally followed by a comma-decimal part (e.g. 5.491.000,00).
+    euro_match = re.search(r'\d{1,3}(?:\.\d{3})+(?:,\d+)?', text)
+    if euro_match:
+        raw = euro_match.group()
+        # Remove period thousands-separators, convert comma decimal to period.
+        normalized = raw.replace('.', '').replace(',', '.')
+        try:
+            return float(normalized)
+        except ValueError:
+            pass
+    # Standard format: commas are thousands separators (e.g. 1,422.85)
+    text = text.replace(',', '')
+    matches = re.findall(r'\d+\.?\d*', text)
+    for match in matches:
+        try:
+            return float(match)
+        except ValueError:
+            continue
+    return None
 
 
 # ----------------------------------------------------------------------
@@ -151,6 +186,12 @@ class DataStore:
             req_id = _clean_str(row.get("request_id"))
             rel_event_id = _clean_str(row.get("related_event_id"))
 
+            # Bug 2 fix: sanitize NaN floats in the stored row so downstream code
+            # never sees float('nan') when accessing row['request_id'] etc.
+            row["user_id"] = user_id
+            row["request_id"] = req_id
+            row["related_event_id"] = rel_event_id
+
             # Partition: only index under messages_by_user if NOT request-specific
             if user_id and not req_id:
                 self.messages_by_user[user_id].append(row)
@@ -210,7 +251,104 @@ class DataStore:
         if event_id in self.events_by_id:
             self.events_by_id[event_id]["amount"] = float(amount)
 
-    def assemble_request_context(self, request_id: str) -> Dict[str, Any]:
+    def resolve_missing_values_with_ocr(
+        self,
+        ocr_pipeline: Optional[Any] = None,
+    ) -> Dict[str, float]:
+        """
+        Iterates over all financial events that have missing amounts, invokes
+        the LangChain OCR pipeline using the associated image relative to user_id,
+        and updates the missing values in DataStore.
+
+        Returns:
+            Dict[str, float]: Map of resolved event_id -> float amount.
+        """
+        if ocr_pipeline is None:
+            try:
+                from .ocr import create_ocr_pipeline
+            except ImportError:
+                from ocr import create_ocr_pipeline
+            ocr_pipeline = create_ocr_pipeline()
+
+        resolved: Dict[str, float] = {}
+
+        for row in self.images_df.to_dict(orient="records"):
+            event_id = _clean_str(row.get("related_event_id"))
+            user_id = _clean_str(row.get("user_id"))
+            image_id = _clean_str(row.get("image_id"))
+            image_path = str(self.images_dir / f"{image_id}.png")
+
+            if not event_id or event_id not in self.events_by_id:
+                continue
+
+            event = self.events_by_id[event_id]
+            current_amount = event.get("amount")
+            # Bug 1 fix: check cache independently from amount presence.
+            # The old single condition short-circuited to False for blank (NaN)
+            # events even when they were already cached, causing repeated OCR calls.
+            if event_id in self.ocr_cache:
+                continue
+            if pd.notna(current_amount) and current_amount != "":
+                continue
+
+            ocr_output = ocr_pipeline.invoke({
+                "user_id": user_id,
+                "image_path": image_path,
+            })
+
+            extracted_amount = _extract_amount_from_ocr_text(ocr_output)
+            if extracted_amount is not None:
+                self.resolve_blank_amount(event_id, extracted_amount)
+                resolved[event_id] = extracted_amount
+
+        return resolved
+
+    def resolve_event_with_ocr(
+        self,
+        event_id: str,
+        ocr_pipeline: Optional[Any] = None,
+    ) -> Optional[float]:
+        """
+        Resolves a single financial event's missing amount using the OCR pipeline.
+        """
+        if event_id in self.ocr_cache:
+            return self.ocr_cache[event_id]
+
+        event = self.events_by_id.get(event_id)
+        if not event:
+            return None
+
+        related_imgs = self.images_by_event.get(event_id, [])
+        if not related_imgs:
+            return None
+
+        if ocr_pipeline is None:
+            try:
+                from .ocr import create_ocr_pipeline
+            except ImportError:
+                from ocr import create_ocr_pipeline
+            ocr_pipeline = create_ocr_pipeline()
+
+        img_info = related_imgs[0]
+        # Bug 3 fix: pass only image_path to the pipeline.
+        # Passing user_id caused ocr.py to re-read images.csv from disk on every call
+        # (resolve_image_for_user takes priority over image_path), ignoring the
+        # pre-resolved path already stored in img_info by DataStore._build_indexes.
+        ocr_output = ocr_pipeline.invoke({
+            "image_path": img_info.get("image_path", ""),
+        })
+
+        amount = _extract_amount_from_ocr_text(ocr_output)
+        if amount is not None:
+            self.resolve_blank_amount(event_id, amount)
+        return amount
+
+    def assemble_request_context(
+        self,
+        request_id: str,
+        auto_resolve_ocr: bool = False,
+        ocr_pipeline: Optional[Any] = None,
+    ) -> Dict[str, Any]:
         """
         Assembles an isolated, clean RequestContext dictionary per request on demand.
 
@@ -270,15 +408,24 @@ class DataStore:
             # Detect blank amount events
             amount_val = ev_copy.get("amount")
             if pd.isna(amount_val) or amount_val == "" or amount_val is None:
-                # Pre-package primary image metadata for OCR convenience
-                img_info = related_imgs[0] if related_imgs else {}
-                ev_copy["ocr_target"] = {
-                    "event_id": event_id,
-                    "image_id": img_info.get("image_id", ""),
-                    "image_path": img_info.get("image_path", ""),
-                    "currency": ev_copy.get("currency", ""),
-                }
-                blank_amount_events.append(ev_copy)
+                if auto_resolve_ocr:
+                    resolved_amt = self.resolve_event_with_ocr(
+                        event_id, ocr_pipeline=ocr_pipeline
+                    )
+                    if resolved_amt is not None:
+                        ev_copy["amount"] = resolved_amt
+                        amount_val = resolved_amt
+
+                if pd.isna(amount_val) or amount_val == "" or amount_val is None:
+                    # Pre-package primary image metadata for OCR convenience
+                    img_info = related_imgs[0] if related_imgs else {}
+                    ev_copy["ocr_target"] = {
+                        "event_id": event_id,
+                        "image_id": img_info.get("image_id", ""),
+                        "image_path": img_info.get("image_path", ""),
+                        "currency": ev_copy.get("currency", ""),
+                    }
+                    blank_amount_events.append(ev_copy)
 
             enriched_events.append(ev_copy)
             if event_id:

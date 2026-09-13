@@ -60,14 +60,15 @@ def resolve_image_for_user(
 
 
 def create_ocr_pipeline(
-    api_key: Optional[str] = None,
-    model_name: Optional[str] = None,
+    api_key: Optional[str] = os.getenv("OPENROUTER_API_KEY"),
+    model_name: Optional[str] = os.getenv("OPENROUTER_MODEL_NAME"),
 ):
     """
     Creates a LangChain pipeline for image OCR to extract missing values.
 
     Input:
-        Dict with 'user_id' (to resolve image relative to user) or 'image_path'.
+        Dict with 'image_path' (preferred, pre-resolved by DataStore) or
+        'user_id' (fallback: resolves the image path from images.csv on disk).
     Output:
         Extracted text string used to complete missing/NaN values.
     """
