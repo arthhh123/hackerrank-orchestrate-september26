@@ -18,8 +18,6 @@ Read [`problem_statement.md`](./problem_statement.md) for the full task spec, in
 
 ---
 
----
-
 ## Setup & Installation Instructions
 
 ### Prerequisites
